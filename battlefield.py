@@ -1,10 +1,10 @@
 # battlefield.py
 import time, random
-from entity_one import Entity as EntityOne
-from entity_two import Entity as EntityTwo
-from brahma import Brahma
-from vishnu import Vishnu
-from shiva import Shiva
+from entity import Entity
+from priest import Priest
+from mechanist import Mechanist
+from gods import get_all_gods
+from gods import Brahma, Vishnu, Shiva
 from cosmic_event import CosmicEvent
 
 def print_status(e1, e2, turn):
@@ -37,26 +37,47 @@ def main():
         "max_mana": 110, "mana_cost": 30, "special_attack_damage": 40,
         "karma": 50, "max_stamina": 100, "accuracy": 0.82, "evasion": 0.12, "critical_chance": 0.12
     }
-    entity1 = EntityOne("Entity1", config1)
-    entity2 = EntityTwo("Entity2", config2)
-    brahma = Brahma()
-    vishnu = Vishnu()
+    gods = get_all_gods()
+    entity1 = Priest("High Priest Tenzin", gods=gods, config=config1)
+    entity2 = Entity("Entity2", config2)
+    entity3 = Mechanist("Entity3") # A godless machine enters the battlefield.
+
+    brahma = gods["brahma"]
+    vishnu = gods["vishnu"]
+    shiva = gods["shiva"]
     shiva = Shiva()
     cosmic = CosmicEvent()
     turn = 0
     max_turns = 50
 
-    while entity1.is_alive() and entity2.is_alive() and turn < max_turns:
+    while all(e.is_alive() for e in [entity1, entity2, entity3]) and turn < max_turns:
         turn += 1
         print(f"\n{'-'*20} Turn {turn} {'-'*20}\n")
         cosmic.apply_event(entity1, entity2, brahma, vishnu, shiva)
         
-        entity1.take_turn(entity2)
-        entity2.take_turn(entity1)
+        # Priest tries divine intervention every 4 turns, otherwise fights
+        # Entity1 (Priest) logic
+        if isinstance(entity1, Priest) and turn % 4 == 0:
+            target = min([entity2, entity3], key=lambda e: e.health)
+            entity1.ability(target)
+        else:
+            entity1.take_turn(random.choice([entity2, entity3]))
+
+        # Entity2 logic — same ol' punch machine
+        entity2.take_turn(random.choice([entity1, entity3]))
+
+        # Entity3 enters the arena — probably ready to tase somebody
+        entity3.take_turn(random.choice([entity1, entity2]))
         
-        brahma.influence_battle(entity1, entity2)
-        vishnu.influence_battle(entity1, entity2)
-        shiva.influence_battle(entity1, entity2)
+        entities = [entity1, entity2]
+        weights = [0.6, 0.4]  # 60% chance to favor entity1
+
+        target1 = random.choices(entities, weights=weights)[0]
+        target2 = entity2 if target1 is entity1 else entity1
+
+        brahma.influence_battle(target1, target2)
+        vishnu.influence_battle(target1, target2)
+        shiva.influence_battle(target1, target2)
         
         # Trade Phase every 5 turns:
         if turn % 5 == 0:

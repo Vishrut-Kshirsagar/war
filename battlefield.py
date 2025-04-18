@@ -3,18 +3,19 @@ import time, random
 from entity import Entity
 from priest import Priest
 from mechanist import Mechanist
+from intern import Intern
 from gods import get_all_gods
 from gods import Brahma, Vishnu, Shiva
 from cosmic_event import CosmicEvent
 
-def print_status(e1, e2, turn):
+def print_status(entities, turn):
     print("\n" + "="*70)
     print(f"Turn {turn} Summary:")
     print("="*70)
-    print(f"{'Name':<10} | {'Health':>8} | {'Mana':>8} | {'Karma':>6} | {'Stamina':>8}")
+    print(f"{'Name':<15} | {'Health':>8} | {'Mana':>8} | {'Karma':>6} | {'Stamina':>8}")
     print("-"*70)
-    print(f"{e1.name:<10} | {e1.health:8.1f} | {e1.mana:8.1f} | {e1.karma:6} | {e1.stamina:8.1f}")
-    print(f"{e2.name:<10} | {e2.health:8.1f} | {e2.mana:8.1f} | {e2.karma:6} | {e2.stamina:8.1f}")
+    for e in entities:
+        print(f"{e.name:<15} | {e.health:8.1f} | {e.mana:8.1f} | {e.karma:6} | {e.stamina:8.1f}")
     print("="*70 + "\n")
 
 def print_deity_stats(brahma, vishnu, shiva):
@@ -39,64 +40,59 @@ def main():
     }
     gods = get_all_gods()
     entity1 = Priest("High Priest Tenzin", gods=gods, config=config1)
-    entity2 = Entity("Entity2", config2)
-    entity3 = Mechanist("Entity3") # A godless machine enters the battlefield.
+    entity2 = Entity("Entity2", config=config2)
+    entity3 = Mechanist("Entity3")
+    entity4 = Intern("Intern Greg")
+
+    entities = [entity1, entity2, entity3, entity4]
 
     brahma = gods["brahma"]
     vishnu = gods["vishnu"]
     shiva = gods["shiva"]
-    shiva = Shiva()
     cosmic = CosmicEvent()
     turn = 0
     max_turns = 50
 
-    while all(e.is_alive() for e in [entity1, entity2, entity3]) and turn < max_turns:
+    while len([e for e in entities if e.is_alive()]) > 1 and turn < max_turns:
         turn += 1
         print(f"\n{'-'*20} Turn {turn} {'-'*20}\n")
         cosmic.apply_event(entity1, entity2, brahma, vishnu, shiva)
-        
-        # Priest tries divine intervention every 4 turns, otherwise fights
-        # Entity1 (Priest) logic
-        if isinstance(entity1, Priest) and turn % 4 == 0:
-            target = min([entity2, entity3], key=lambda e: e.health)
-            entity1.ability(target)
-        else:
-            entity1.take_turn(random.choice([entity2, entity3]))
 
-        # Entity2 logic — same ol' punch machine
-        entity2.take_turn(random.choice([entity1, entity3]))
+        for e in entities:
+            if not e.is_alive():
+                continue
+            opponents = [op for op in entities if op != e and op.is_alive()]
+            if opponents:
+                target = random.choice(opponents)
+                if isinstance(e, Priest) and turn % 4 == 0:
+                    e.ability(target)
+                else:
+                    e.take_turn(target)
 
-        # Entity3 enters the arena — probably ready to tase somebody
-        entity3.take_turn(random.choice([entity1, entity2]))
-        
-        entities = [entity1, entity2]
-        weights = [0.6, 0.4]  # 60% chance to favor entity1
+        favored = random.choices([entity1, entity2], weights=[0.6, 0.4])[0]
+        others = [e for e in entities if e != favored and e.is_alive()]
+        if others:
+            target = random.choice(others)
+            brahma.influence_battle(favored, target)
+            vishnu.influence_battle(favored, target)
+            shiva.influence_battle(favored, target)
 
-        target1 = random.choices(entities, weights=weights)[0]
-        target2 = entity2 if target1 is entity1 else entity1
-
-        brahma.influence_battle(target1, target2)
-        vishnu.influence_battle(target1, target2)
-        shiva.influence_battle(target1, target2)
-        
-        # Trade Phase every 5 turns:
         if turn % 5 == 0:
             if entity1.health < 50 and entity1.inventory.get("health_potion", 0) < 1 and entity2.inventory.get("health_potion", 0) > 0:
                 offer = {"mana_potion": 1}
                 request = {"health_potion": 1}
                 if entity1.propose_trade(entity2, offer, request):
                     entity2.accept_trade(entity1, offer, request)
-        
-        print_status(entity1, entity2, turn)
+
+        print_status(entities, turn)
         time.sleep(1)
-    
-    if entity1.is_alive() and entity2.is_alive():
-        print("After 50 intense turns, the war ends in a stalemate!")
-    elif entity1.is_alive():
-        print(f"{entity1.name} wins after {turn} turns!")
+
+    alive = [e for e in entities if e.is_alive()]
+    if len(alive) == 1:
+        print(f"{alive[0].name} wins after {turn} turns!")
     else:
-        print(f"{entity2.name} wins after {turn} turns!")
-    
+        print("After 50 intense turns, the war ends in a stalemate!")
+
     print_deity_stats(brahma, vishnu, shiva)
 
 if __name__ == "__main__":
